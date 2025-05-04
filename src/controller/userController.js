@@ -1,9 +1,22 @@
 import User from "../models/userModel.js";
-import { validateUserInput,generateToken } from "../utils/utils.js";
+import { validateUserInput, generateToken } from "../utils/utils.js";
 import bcrypt from 'bcryptjs';
 
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password');
 
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      users
+    });
 
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
 
 export const deleteUserByEmail = async (req, res) => {
   try {
@@ -50,7 +63,7 @@ export const createUser = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      role: role || 'user'  // Eğer gönderilmediyse 'user' olarak ata
+      role: role || 'user'
     });
 
     const token = generateToken(savedUser._id);
@@ -129,6 +142,42 @@ export const findUserByEmail = async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const updateUser = async (req, res) => {
+  try {
+    const { email, username, password, role } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (username) user.username = username;
+    if (password) user.password = bcrypt.hashSync(password, 10);
+    if (role) user.role = role;
+
+    const updatedUser = await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      user: {
+        id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
       },
     });
   } catch (error) {
