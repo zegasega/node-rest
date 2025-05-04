@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 export const validateUserInput = ({ username, email, password }) => {
   const errors = {};
@@ -40,7 +41,7 @@ export const generateToken = (userId) => {
 };
 
 
-const limiter = rateLimit({
+export const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100,
   message: 'Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.',
