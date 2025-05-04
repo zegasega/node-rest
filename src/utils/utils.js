@@ -1,5 +1,19 @@
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
+import axios from 'axios';
+
+
+
+
+const getBitcoinPrice = async () => {
+  try {
+    const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    const bitcoinPrice = response.data.bitcoin.usd;
+    console.log(`Bitcoin Price: $${bitcoinPrice}`);
+  } catch (error) {
+    console.error('Error fetching Bitcoin price:', error);
+  }
+};
 
 export const validateUserInput = ({ username, email, password }) => {
   const errors = {};
