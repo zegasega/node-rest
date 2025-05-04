@@ -22,7 +22,8 @@ export const deleteUserByEmail = async (req,res) =>{
         res.status(200).json({ message: 'User is Succesfully Deleted!', user: deletedUser });
         
     } catch (error) {
-        
+        console.error(error)
+        console.log(error)
     }
 }
 
@@ -65,6 +66,7 @@ export const createUser = async (req, res) => {
       });
     }
   };
+
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
