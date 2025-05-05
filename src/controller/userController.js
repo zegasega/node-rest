@@ -1,187 +1,179 @@
 import User from "../models/userModel.js";
 import { validateUserInput, generateToken } from "../utils/utils.js";
 import bcrypt from 'bcryptjs';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiResponse } from '../utils/response.js';
+import { AppError } from '../middleware/errorHandler.js';
 
-export const getAllUsers = async (req, res) => {
-  try {
+class UserController {
+  /**
+   * @desc    Get all users
+   * @route   GET /api/users
+   * @access  Private/Admin
+   */
+  getAllUsers = asyncHandler(async (req, res) => {
     const users = await User.find().select('-password');
-
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      users
+    
+    return ApiResponse.success(res, {
+      users,
+      count: users.length
     });
+  });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-};
-
-export const deleteUserByEmail = async (req, res) => {
-  try {
+  /**
+   * @desc    Delete user by email
+   * @route   DELETE /api/users/email
+   * @access  Private/Admin
+   */
+  deleteUserByEmail = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: 'Invalid Payload' });
+      throw new AppError('Email is required', 400);
     }
 
     const deletedUser = await User.findOneAndDelete({ email });
 
     if (!deletedUser) {
-      return res.status(404).json({ message: 'User NOT FOUND' });
+      throw new AppError('User not found', 404);
     }
 
-    res.status(200).json({
-      message: 'User is Successfully Deleted!',
-      user: deletedUser
-    });
+    return ApiResponse.success(res, { user: deletedUser }, 'User successfully deleted');
+  });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-export const createUser = async (req, res) => {
-  try {
+  /**
+   * @desc    Create new user
+   * @route   POST /api/users/register
+   * @access  Public
+   */
+  createUser = asyncHandler(async (req, res) => {
     const { username, email, password, role } = req.body;
 
     const { isValid, errors } = validateUserInput({ username, email, password });
     if (!isValid) {
-      return res.status(400).json({ success: false, errors });
+      throw new AppError('Invalid input', 400, errors);
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: "Email already exists" });
+      throw new AppError('Email already exists', 400);
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const savedUser = await User.create({
+    const user = await User.create({
       username,
       email,
       password: hashedPassword,
       role: role || 'user'
     });
 
-    const token = generateToken(savedUser._id);
+    const token = generateToken(user._id);
 
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
+    return ApiResponse.created(res, {
       token,
       user: {
-        id: savedUser._id,
-        username: savedUser.username,
-        email: savedUser.email,
-        role: savedUser.role
-      },
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
     });
+  });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-};
-
-export const loginUser = async (req, res) => {
-  try {
+  /**
+   * @desc    Login user
+   * @route   POST /api/users/login
+   * @access  Public
+   */
+  loginUser = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    if (!email || !password) {
+      throw new AppError('Please provide email and password', 400);
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    const user = await User.findOne({ email }).select('+password');
+    
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      throw new AppError('Invalid credentials', 401);
     }
 
     const token = generateToken(user._id);
 
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
+    return ApiResponse.success(res, {
       token,
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
-      },
+        role: user.role
+      }
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+  });
 
-export const findUserByEmail = async (req, res) => {
-  try {
+  /**
+   * @desc    Find user by email
+   * @route   POST /api/users/email
+   * @access  Private
+   */
+  findUserByEmail = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      throw new AppError('Email is required', 400);
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      throw new AppError('User not found', 404);
     }
 
-    res.status(200).json({
-      success: true,
-      message: "User exists",
+    return ApiResponse.success(res, {
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
-      },
+        role: user.role
+      }
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+  });
 
-export const updateUser = async (req, res) => {
-  try {
+  /**
+   * @desc    Update user
+   * @route   PUT /api/users/:id
+   * @access  Private
+   */
+  updateUser = asyncHandler(async (req, res) => {
     const { email, username, password, role } = req.body;
 
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      throw new AppError('Email is required', 400);
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      throw new AppError('User not found', 404);
     }
 
+    // Update only provided fields
     if (username) user.username = username;
-    if (password) user.password = bcrypt.hashSync(password, 10);
+    if (password) user.password = await bcrypt.hash(password, 12);
     if (role) user.role = role;
 
     const updatedUser = await user.save();
 
-    res.status(200).json({
-      success: true,
-      message: "User updated successfully",
+    return ApiResponse.success(res, {
       user: {
         id: updatedUser._id,
         username: updatedUser.username,
         email: updatedUser.email,
-        role: updatedUser.role,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+        role: updatedUser.role
+      }
+    }, 'User updated successfully');
+  });
+}
+
+export default new UserController();

@@ -1,16 +1,23 @@
 import express from 'express';
-import { createUser, deleteUserByEmail, findUserByEmail, getAllUsers, loginUser } from '../controller/userController.js';
+import UserController from '../controller/userController.js';
 import { auth, authorize } from '../middleware/auth.js';
 
-const userRouter = express.Router();
+const router = express.Router();
 
+// Public routes
+router.post('/register', UserController.createUser);
+router.post('/login', UserController.loginUser);
 
-userRouter.post('/register', createUser);
-userRouter.post('/login', loginUser);
-userRouter.post('/email', findUserByEmail);
-userRouter.get('/user', getAllUsers);
+// Protected routes
+router.use(auth); // Apply authentication middleware to all routes below
 
+router.route('/email')
+  .post(UserController.findUserByEmail)
+  .delete(authorize(['admin']), UserController.deleteUserByEmail);
 
-userRouter.delete('/email', auth, authorize(['admin']), deleteUserByEmail);
+router.route('/profile')
+  .put(UserController.updateUser);
 
-export default userRouter;
+router.get('/users', authorize(['admin']), UserController.getAllUsers);
+
+export default router;
